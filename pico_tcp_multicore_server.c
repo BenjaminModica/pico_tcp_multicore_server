@@ -4,62 +4,11 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <string.h>
-#include <stdlib.h>
+#include "pico_tcp_multicore_server.h"
 
-#include "secrets.h"
-
-#include "pico/stdlib.h"
-#include "pico/cyw43_arch.h"
-#include "pico/multicore.h"
-
-#include "lwip/pbuf.h"
-#include "lwip/tcp.h"
-
-#define TCP_PORT 4242
-#define DEBUG_printf printf
-#define BUF_SIZE_RECV 1
-#define BUF_SIZE_SENT 24
-#define TEST_ITERATIONS 10
-#define POLL_TIME_S 60
-
-#define LED_PIN 19
-
-typedef struct TCP_SERVER_T_ {
-    struct tcp_pcb *server_pcb;
-    struct tcp_pcb *client_pcb;
-    bool complete;
-    uint8_t buffer_sent[BUF_SIZE_SENT];
-    uint8_t buffer_recv[BUF_SIZE_RECV];
-    int sent_len;
-    int recv_len;
-    int run_count;
-} TCP_SERVER_T;
-
-static TCP_SERVER_T* tcp_server_init(void);
-
-static err_t tcp_server_close(void *arg);
-
-static err_t tcp_server_result(void *arg, int status);
-
-static err_t tcp_server_sent(void *arg, struct tcp_pcb *tpcb, u16_t len);
-
-err_t tcp_server_send_data(void *arg, struct tcp_pcb *tpcb);
-
-err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err);
-
-static err_t tcp_server_poll(void *arg, struct tcp_pcb *tpcb);
-
-static void tcp_server_err(void *arg, err_t err);
-
-static err_t tcp_server_accept(void *arg, struct tcp_pcb *client_pcb, err_t err);
-
-static bool tcp_server_open(void *arg);
-
-void run_tcp_server_test(void);
-
-uint8_t wifi_init();
-
+/**
+ * This is the "main" function for the second core running wifi and TCP server
+*/
 void wifi_core() {
     while (wifi_init());
     run_tcp_server_test();
@@ -93,7 +42,7 @@ static TCP_SERVER_T* tcp_server_init(void) {
     return state;
 }
 
-static err_t tcp_server_close(void *arg) {
+static err_t tcp_client_close(void *arg) {
     TCP_SERVER_T *state = (TCP_SERVER_T*)arg;
     err_t err = ERR_OK;
     if (state->client_pcb != NULL) {
@@ -110,11 +59,13 @@ static err_t tcp_server_close(void *arg) {
         }
         state->client_pcb = NULL;
     }
+    /* This is for also closing the server
     if (state->server_pcb) {
         tcp_arg(state->server_pcb, NULL);
         tcp_close(state->server_pcb);
         state->server_pcb = NULL;
     }
+    */
     return err;
 }
 
@@ -125,8 +76,7 @@ static err_t tcp_server_result(void *arg, int status) {
     } else {
         DEBUG_printf("test failed %d\n", status);
     }
-    state->complete = true;
-    return tcp_server_close(arg);
+    return tcp_client_close(arg);
 }
 
 static err_t tcp_server_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) {
@@ -174,7 +124,8 @@ err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
     TCP_SERVER_T *state = (TCP_SERVER_T*)arg;
     if (!p) {
         DEBUG_printf("No main packet buffer struct\n\r");
-        return tcp_server_result(arg, -1);
+        DEBUG_printf("Client probably disconnected\n\r");
+        return tcp_server_result(arg, 0); //Going to interpret this as no error? 
     }
     // this method is callback from lwIP, so cyw43_arch_lwip_begin is not required, however you
     // can use this method to cause an assertion in debug mode, if this method is called when
@@ -259,7 +210,7 @@ static err_t tcp_server_accept(void *arg, struct tcp_pcb *client_pcb, err_t err)
     tcp_arg(client_pcb, state);
     tcp_sent(client_pcb, tcp_server_sent);
     tcp_recv(client_pcb, tcp_server_recv);
-    //tcp_poll(client_pcb, tcp_server_poll, POLL_TIME_S * 2);
+    //tcp_poll(client_pcb, tcp_server_poll, POLL_TIME_S * 2); //Uncomment for timeout on response from client. 
     tcp_err(client_pcb, tcp_server_err);
 
     return tcp_server_send_data(arg, state->client_pcb);
