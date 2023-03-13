@@ -165,6 +165,7 @@ err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
             cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
         } else if (memcmp(state->buffer_recv, OFF, BUF_SIZE_RECV) == 0) {
             //turn off led
+            DEBUG_printf("LED OFF\n");
             cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
             gpio_put(LED_PIN, 0);
         } else {
