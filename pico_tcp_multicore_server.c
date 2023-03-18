@@ -128,7 +128,7 @@ err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
         return tcp_server_result(arg, 0); //Going to interpret this as no error? 
     }
     // this method is callback from lwIP, so cyw43_arch_lwip_begin is not required, however you
-    // can use this method to cause an assertion in debug mode, if this method is called when
+    // can use this method to cause an assertion in debug mode, if this method is called then
     // cyw43_arch_lwip_begin IS needed
     cyw43_arch_lwip_check();
     if (p->tot_len > 0) {

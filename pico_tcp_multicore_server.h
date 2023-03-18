@@ -9,6 +9,7 @@
 #include "pico/stdlib.h"
 #include "pico/cyw43_arch.h"
 #include "pico/multicore.h"
+#include "boards/pico_w.h"
 
 #include "lwip/pbuf.h"
 #include "lwip/tcp.h"
